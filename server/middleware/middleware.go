@@ -1,4 +1,4 @@
-package controller
+package middleware
 
 import (
 	"example/server/model"
@@ -7,7 +7,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
-var jwtKey = []byte("my_secret_key")
+var JwtKey = []byte("my_secret_key")
 
 func Athutenticate(f http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +24,7 @@ func Athutenticate(f http.HandlerFunc) http.HandlerFunc {
 		tknStr := c.Value
 		claims := &model.Claims{}
 		tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
-			return jwtKey, nil
+			return JwtKey, nil
 		})
 		if err != nil {
 			if err == jwt.ErrSignatureInvalid {

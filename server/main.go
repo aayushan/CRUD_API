@@ -13,12 +13,12 @@ import (
 func main() {
 	database.DbMigrator()
 	r := route.Router()
+	header := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"})
 	methods := handlers.AllowedMethods([]string{"POST", "GET", "PATCH", "DELETE"})
 	origins := handlers.AllowedOrigins([]string{"*"})
-	err := http.ListenAndServe(":8081", handlers.CORS(methods, origins)(r))
+	credential:= handlers.AllowCredentials()
+	err := http.ListenAndServe(":8081", handlers.CORS(methods, header, origins,credential)(r))
 	if err != nil {
 		Logger.ErrorLog.Println(fmt.Errorf("error :%s", err))
 	}
-	Logger.CommonLog.Println("Server is Running")
-	Logger.CommonLog.Println("checking")
 }

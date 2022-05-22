@@ -59,6 +59,9 @@ func UpdateUser(user *model.User) model.User {
 func DeleteUser(id string) error {
 	var user model.User
 	DB.First(&user, id)
+	fmt.Println("The Id :", id)
+	fmt.Println("The user :", user)
+
 	if user.ID == 0 {
 		err := errors.New("NO DATA FOUND TO DELTE")
 		return err

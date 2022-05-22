@@ -3,6 +3,8 @@ package controller
 import (
 	"encoding/json"
 	"example/server/database"
+	"example/server/middleware"
+
 	"example/server/model"
 	"fmt"
 	"math"
@@ -31,26 +33,36 @@ func HashPassword(password string) (string, error) {
 
 // Signup API
 func Signup(w http.ResponseWriter, req *http.Request) {
+	fmt.Println("sigin started")
 	w.Header().Add("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	var user model.User
 	err := json.NewDecoder(req.Body).Decode(&user)
 	if err != nil {
 		fmt.Println("error occured", err)
 	}
-	fmt.Println(user)
-	err = myvalidator(user) // Validating fields
+	fmt.Println("thr dob:", user)
+	// Validating fields
+	err = myvalidator(user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Println("i am validated")
 	hp, _ := HashPassword(user.Password) //  Hashing password
 	user.Password = hp
 	user = database.CreateUser(&user)
+	if user.ID == 0 {
+		http.Error(w, "UserAlreadyFound", http.StatusBadRequest)
+		return
+	}
 	ruser := model.Mapping(user)
-	ruser.Age = age.Age(*user.DateOfBirth)
-	json.NewEncoder(w).Encode(ruser)
+	dateString := user.DateOfBirth
+	date, _ := time.Parse("2006-01-02", dateString)
+	fmt.Println(date)
+	ruser.Age = age.Age(date)
+	err = json.NewEncoder(w).Encode(ruser)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 }
 
 //Updating user
@@ -94,7 +106,9 @@ func DeleteUser(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintln(w, "USER DELETED")
 }
 
+//read
 func Read(w http.ResponseWriter, req *http.Request) {
+
 	w.Header().Add("Content-Type", "application/json")
 	DB := database.GetDb()
 	var ruser []model.ResUser
@@ -105,6 +119,7 @@ func Read(w http.ResponseWriter, req *http.Request) {
 	email := req.URL.Query().Get("email")
 	sort := req.URL.Query().Get("sort")
 	order := req.URL.Query().Get("order")
+
 	sql := "SELECT * FROM users where archived=0"
 	if archived == "true" {
 		sql = "SELECT * FROM users where archived=1"
@@ -130,13 +145,11 @@ func Read(w http.ResponseWriter, req *http.Request) {
 	if page == 0 {
 		page = 1
 	}
-	perpage := 2
-	var total int64
-	var x int
-	DB.Raw(sql).Count(&total).Scan(x)
+	perpage := 10
+	var total int
 	sql = fmt.Sprintf("%s LIMIT %d OFFSET %d", sql, perpage, (page-1)*perpage)
 	DB.Raw(sql).Scan(&ruser)
-
+	total = len(ruser)
 	if len(ruser) == 0 {
 		w.WriteHeader(404)
 		fmt.Fprintln(w, "NO DATA FOUND")
@@ -146,19 +159,36 @@ func Read(w http.ResponseWriter, req *http.Request) {
 		Data:      ruser,
 		Total:     total,
 		Page:      page,
-		Last_page: math.Ceil(float64(total / int64(perpage))),
+		Last_page: math.Ceil(float64(total / (perpage))),
 	}
 	json.NewEncoder(w).Encode(pages)
 }
 
-func Login(w http.ResponseWriter, res *http.Request) {
-	fmt.Printf("i am login")
+// Login
+func Login(w http.ResponseWriter, req *http.Request) {
+	w.Header().Add("Content-Type", "application/json")
 	var cred model.Cred
 	var user model.User
 	DB := database.GetDb()
+	type message struct {
+		Info   string
+		Status int
+	}
+	var mess message
+	x, _ := req.Cookie("token")
+	if x != nil {
+		mess = message{
+			Info:   "Already logged in",
+			Status: 401,
+		}
+		w.WriteHeader(http.StatusBadRequest)
 
-	err := json.NewDecoder(res.Body).Decode(&cred)
-	fmt.Println(cred.Email)
+		json.NewEncoder(w).Encode(mess)
+
+		return
+
+	}
+	err := json.NewDecoder(req.Body).Decode(&cred)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -167,6 +197,11 @@ func Login(w http.ResponseWriter, res *http.Request) {
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(cred.Password))
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
+		mess = message{
+			Info:   "invalid email or password",
+			Status: 401,
+		}
+		json.NewEncoder(w).Encode(mess)
 		return
 	}
 	expirationTime := time.Now().Add(5 * time.Minute)
@@ -178,17 +213,23 @@ func Login(w http.ResponseWriter, res *http.Request) {
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(jwtKey)
+	TokenString, err := token.SignedString(middleware.JwtKey)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	fmt.Println(TokenString)
 	http.SetCookie(w, &http.Cookie{
 		Name:    "token",
-		Value:   tokenString,
+		Value:   TokenString,
 		Expires: expirationTime,
 	})
-	fmt.Fprintln(w, "you are logged in")
+	fmt.Println(req.Cookie("token"))
+	mess = message{
+		Info:   "you are logged in",
+		Status: 200,
+	}
+	json.NewEncoder(w).Encode(mess)
 }
 
 //Logout
