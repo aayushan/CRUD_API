@@ -40,7 +40,6 @@ func Signup(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		fmt.Println("error occured", err)
 	}
-	fmt.Println("thr dob:", user)
 	// Validating fields
 	err = myvalidator(user)
 	if err != nil {
@@ -55,10 +54,6 @@ func Signup(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	ruser := model.Mapping(user)
-	dateString := user.DateOfBirth
-	date, _ := time.Parse("2006-01-02", dateString)
-	fmt.Println(date)
-	ruser.Age = age.Age(date)
 	err = json.NewEncoder(w).Encode(ruser)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -155,6 +150,11 @@ func Read(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprintln(w, "NO DATA FOUND")
 		return
 	}
+	for i, _ := range ruser {
+		dateString := ruser[i].DateOfBirth
+		date, _ := time.Parse("2006-01-02", dateString)
+		ruser[i].Age = age.Age(date)
+	}
 	pages := model.Paginate{
 		Data:      ruser,
 		Total:     total,
@@ -218,11 +218,12 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	fmt.Println(TokenString)
+	fmt.Println("token", TokenString)
 	http.SetCookie(w, &http.Cookie{
 		Name:    "token",
 		Value:   TokenString,
 		Expires: expirationTime,
+		Path:    "/",
 	})
 	fmt.Println(req.Cookie("token"))
 	mess = message{
