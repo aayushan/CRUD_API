@@ -33,7 +33,6 @@ func HashPassword(password string) (string, error) {
 
 // Signup API
 func Signup(w http.ResponseWriter, req *http.Request) {
-	fmt.Println("sigin started")
 	w.Header().Add("Content-Type", "application/json")
 	var user model.User
 	err := json.NewDecoder(req.Body).Decode(&user)
@@ -64,8 +63,8 @@ func Signup(w http.ResponseWriter, req *http.Request) {
 func UpdateUser(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	var user model.User
-	ID := mux.Vars(req)
-	x := ID["id"]
+	id := mux.Vars(req)
+	x := id["id"]
 	user = database.GetUserById(x)
 	err := json.NewDecoder(req.Body).Decode(&user)
 	if err != nil {
@@ -220,10 +219,10 @@ func Login(w http.ResponseWriter, req *http.Request) {
 	}
 	fmt.Println("token", TokenString)
 	http.SetCookie(w, &http.Cookie{
-		Name:    "token",
-		Value:   TokenString,
-		Expires: expirationTime,
-		Path:    "/",
+		Name:     "token",
+		Value:    TokenString,
+		Expires:  expirationTime,
+		HttpOnly: x.Secure,
 	})
 	fmt.Println(req.Cookie("token"))
 	mess = message{
